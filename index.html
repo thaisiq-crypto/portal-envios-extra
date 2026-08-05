@@ -131,7 +131,16 @@ function FormIndicar({ onSubmit, onClose }) {
         historico:[{status:"em_validacao",data:new Date().toISOString(),obs:"Indicação recebida"}],
       });
       setDone(true);
-    } catch(e) { alert("Erro ao salvar. Tente novamente."); }
+    } catch(e) {
+      console.error(e);
+      if(e.code==="permission-denied"||String(e).includes("permission")) {
+        alert("⚠️ Permissão negada pelo banco de dados.
+
+O administrador precisa liberar as Regras do Firestore no Firebase Console.");
+      } else {
+        alert("❌ Erro ao salvar: " + (e.message||"Tente novamente."));
+      }
+    }
     setLoading(false);
   };
 
@@ -317,6 +326,7 @@ function App() {
   const [showF, setShowF] = useState(false);
   const [det, setDet] = useState(null);
   const [filtro, setFiltro] = useState("todos");
+  const [svcFiltro, setSvcFiltro] = useState("todos");
   const [q, setQ] = useState("");
   const [fbReady, setFbReady] = useState(!!window.__fb);
   const [loading, setLoading] = useState(true);
@@ -354,7 +364,8 @@ function App() {
   };
 
   const counts = STATUS.reduce((a,s)=>({...a,[s.v]:ind.filter(i=>i.status===s.v).length}),{});
-  const fil = ind.filter(i=>(filtro==="todos"||i.status===filtro)&&(!q||i.nome?.toLowerCase().includes(q.toLowerCase())||i.telefone?.includes(q)));
+  const fil = ind.filter(i=>(filtro==="todos"||i.status===filtro)&&(svcFiltro==="todos"||i.svc===svcFiltro)&&(!q||i.nome?.toLowerCase().includes(q.toLowerCase())||i.telefone?.includes(q)));
+  const svcsUsados = ["todos",...[...new Set(ind.map(i=>i.svc).filter(Boolean))].sort()];
 
   if (!fbReady || loading) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:16}}>
@@ -416,9 +427,12 @@ function App() {
               <p style={{fontSize:12,color:"#888"}}>{s.l}</p>
             </div>)}
           </div>
-          <div style={{display:"flex",gap:10,marginBottom:16}}>
-            <input style={{...ST.inp,flex:1,fontSize:15}} placeholder="🔍  Buscar por nome ou telefone..." value={q} onChange={e=>setQ(e.target.value)}/>
-            {filtro!=="todos"&&<button onClick={()=>setFiltro("todos")} style={{...ST.btnSec,whiteSpace:"nowrap",fontSize:13}}>Limpar ✕</button>}
+          <div style={{display:"flex",gap:10,marginBottom:10,flexWrap:"wrap"}}>
+            <input style={{...ST.inp,flex:2,minWidth:180,fontSize:15}} placeholder="🔍  Buscar por nome ou telefone..." value={q} onChange={e=>setQ(e.target.value)}/>
+            <select style={{...ST.inp,flex:1,minWidth:140,fontSize:14}} value={svcFiltro} onChange={e=>setSvcFiltro(e.target.value)}>
+              {svcsUsados.map(s=><option key={s} value={s}>{s==="todos"?"📍 Todos os SVCs":s}</option>)}
+            </select>
+            {(filtro!=="todos"||svcFiltro!=="todos")&&<button onClick={()=>{setFiltro("todos");setSvcFiltro("todos");}} style={{...ST.btnSec,whiteSpace:"nowrap",fontSize:13}}>Limpar ✕</button>}
           </div>
           {fil.length===0
             ? <div style={{textAlign:"center",padding:44,background:"#fff",borderRadius:14,color:"#aaa",fontSize:15}}>Nenhum resultado encontrado.</div>
