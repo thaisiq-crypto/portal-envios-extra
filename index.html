@@ -7,6 +7,29 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyADPBoiQUzVf-rWGQo2rtbYMJRsEGK0fKI",
+    authDomain: "portal-envios-extra.firebaseapp.com",
+    projectId: "portal-envios-extra",
+    storageBucket: "portal-envios-extra.firebasestorage.app",
+    messagingSenderId: "400010191067",
+    appId: "1:400010191067:web:d907063fdf53648f56acfe"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  window.__fb = {
+    db,
+    collection: (name) => collection(db, name),
+    onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy
+  };
+  window.dispatchEvent(new Event("firebase-ready"));
+</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f5;min-height:100vh}
@@ -20,8 +43,6 @@
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 
-const DB_KEY = "meli-envios-extra-portal-v1";
-
 const STATUS = [
   { v:"em_validacao",      l:"Em Validação",      c:"#3483FA", bg:"#EBF3FF" },
   { v:"contato_realizado", l:"Contato Realizado",  c:"#FF7733", bg:"#FFF3EB" },
@@ -32,7 +53,6 @@ const STATUS = [
 ];
 
 const PERFIS = ["TAC CPF","ETC (CNPJ)"];
-
 const SVC = ["SSP30 - Guarulhos","SSP34 - Cotia","SSP37 - Campinas 2","SSP38 - Itupeva",
   "SSP40 - Zona Norte","SSP44 - Vila Leopoldina","SSP45 - Itaquera","SSP48 - Jaguare",
   "SSP49 - Zona Norte II","SSP3 - Campinas","SSP5 - Arena","SSP6 - Maua","SSP7 - Zona Oeste",
@@ -44,16 +64,8 @@ const SVC = ["SSP30 - Guarulhos","SSP34 - Cotia","SSP37 - Campinas 2","SSP38 - I
 
 const getS = v => STATUS.find(s=>s.v===v)||STATUS[0];
 
-// Storage — usa localStorage
-const db = {
-  load: () => { try { return JSON.parse(localStorage.getItem(DB_KEY)||"[]"); } catch(_){ return []; } },
-  save: (data) => { try { localStorage.setItem(DB_KEY, JSON.stringify(data)); } catch(_){} },
-};
-
-/* ── estilos compartilhados ── */
 const ST = {
-  btn:    { background:"#FFE600", color:"#222", border:"none", padding:"11px 22px", borderRadius:9, cursor:"pointer", fontWeight:700, fontSize:15, transition:"opacity .15s" },
-  btnSm:  { background:"#FFE600", color:"#222", border:"none", padding:"8px 16px", borderRadius:8, cursor:"pointer", fontWeight:700, fontSize:13 },
+  btn:    { background:"#FFE600", color:"#222", border:"none", padding:"11px 22px", borderRadius:9, cursor:"pointer", fontWeight:700, fontSize:15 },
   btnSec: { background:"#fff", color:"#444", border:"1px solid #ddd", padding:"11px 18px", borderRadius:9, cursor:"pointer", fontWeight:600, fontSize:14 },
   inp:    { width:"100%", padding:"12px 15px", border:"1.5px solid #ddd", borderRadius:9, fontSize:15, color:"#222", background:"#fff", outline:"none" },
   lbl:    { display:"block", fontSize:12, fontWeight:700, color:"#555", marginBottom:7, textTransform:"uppercase", letterSpacing:.6 },
@@ -62,27 +74,19 @@ const ST = {
 
 function Avatar({ name }) {
   const i = (name||"?").split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase();
-  return (
-    <div style={{width:44,height:44,borderRadius:"50%",background:"#FFE600",color:"#222",fontWeight:800,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 6px rgba(0,0,0,.1)"}}>
-      {i}
-    </div>
-  );
+  return <div style={{width:44,height:44,borderRadius:"50%",background:"#FFE600",color:"#222",fontWeight:800,fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:"0 2px 6px rgba(0,0,0,.1)"}}>{i}</div>;
 }
 
 function Badge({ status }) {
   const s = getS(status);
-  return (
-    <span style={{background:s.bg,color:s.c,border:`1.5px solid ${s.c}44`,borderRadius:20,padding:"4px 12px",fontSize:13,fontWeight:700,whiteSpace:"nowrap"}}>
-      {s.l}
-    </span>
-  );
+  return <span style={{background:s.bg,color:s.c,border:`1.5px solid ${s.c}44`,borderRadius:20,padding:"4px 12px",fontSize:13,fontWeight:700,whiteSpace:"nowrap"}}>{s.l}</span>;
 }
 
-function Modal({ onClose, children, maxW }) {
+function Modal({ onClose, children }) {
   return (
     <div onClick={e=>e.target===e.currentTarget&&onClose()}
       style={{position:"fixed",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16,overflowY:"auto"}}>
-      <div style={{background:"#fff",borderRadius:18,width:"100%",maxWidth:maxW||540,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 24px 70px rgba(0,0,0,.22)"}}>
+      <div style={{background:"#fff",borderRadius:18,width:"100%",maxWidth:540,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 24px 70px rgba(0,0,0,.22)"}}>
         {children}
       </div>
     </div>
@@ -98,10 +102,7 @@ function UploadBox({ label, emoji, preview, onFile, color }) {
         style={{border:`2.5px dashed ${preview?color:"#ddd"}`,borderRadius:14,padding:preview?10:28,textAlign:"center",cursor:"pointer",background:preview?`${color}0f`:"#fafafa",transition:"all .2s"}}>
         {preview
           ? <img src={preview} alt="" style={{maxHeight:180,maxWidth:"100%",borderRadius:10,boxShadow:"0 4px 12px rgba(0,0,0,.1)"}}/>
-          : <>
-              <div style={{fontSize:36,marginBottom:8}}>{emoji}</div>
-              <p style={{color:"#aaa",fontSize:14,lineHeight:1.5}}>Clique para enviar o print<br/><span style={{fontSize:12}}>JPG ou PNG</span></p>
-            </>
+          : <><div style={{fontSize:36,marginBottom:8}}>{emoji}</div><p style={{color:"#aaa",fontSize:14,lineHeight:1.5}}>Clique para enviar o print<br/><span style={{fontSize:12}}>JPG ou PNG</span></p></>
         }
       </div>
       {preview && <p style={{color,fontSize:13,margin:"6px 0 0",fontWeight:600}}>✅ Imagem carregada</p>}
@@ -111,7 +112,6 @@ function UploadBox({ label, emoji, preview, onFile, color }) {
   );
 }
 
-/* ── FORMULÁRIO ── */
 function FormIndicar({ onSubmit, onClose }) {
   const [step, setStep] = useState(1);
   const [f, setF] = useState({nome:"",tel:"",svc:"",perfil:"",obs:""});
@@ -120,122 +120,79 @@ function FormIndicar({ onSubmit, onClose }) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const set = (k,v) => setF(x=>({...x,[k]:v}));
-
-  const ok1=f.nome.trim()&&f.tel.trim();
-  const ok2=f.svc&&f.perfil;
-  const ok3=ee&&log;
+  const ok1=f.nome.trim()&&f.tel.trim(), ok2=f.svc&&f.perfil, ok3=ee&&log;
 
   const submit = async () => {
     setLoading(true);
-    await new Promise(r=>setTimeout(r,600));
-    onSubmit({
-      id: Date.now().toString(),
-      nome: f.nome, telefone: f.tel, svc: f.svc,
-      perfil: f.perfil, obs: f.obs, ee, log,
-      status: "em_validacao",
-      criadoEm: new Date().toISOString(),
-      atualizadoEm: new Date().toISOString(),
-      historico: [{status:"em_validacao",data:new Date().toISOString(),obs:"Indicação recebida"}],
-    });
-    setLoading(false); setDone(true);
+    try {
+      await onSubmit({
+        nome:f.nome, telefone:f.tel, svc:f.svc, perfil:f.perfil, obs:f.obs, ee, log,
+        status:"em_validacao", criadoEm:new Date().toISOString(), atualizadoEm:new Date().toISOString(),
+        historico:[{status:"em_validacao",data:new Date().toISOString(),obs:"Indicação recebida"}],
+      });
+      setDone(true);
+    } catch(e) { alert("Erro ao salvar. Tente novamente."); }
+    setLoading(false);
   };
 
   if (done) return (
     <div style={{padding:48,textAlign:"center"}}>
       <div style={{fontSize:64,marginBottom:12}}>✅</div>
       <h3 style={{fontSize:22,marginBottom:8}}>Indicação enviada!</h3>
-      <p style={{color:"#666",fontSize:15,marginBottom:28}}>O time de aquisição irá analisar e acionar o motorista.</p>
+      <p style={{color:"#666",fontSize:15,marginBottom:28}}>O time de aquisição irá analisar e acionar.</p>
       <button onClick={onClose} style={ST.btn}>Fechar</button>
     </div>
   );
 
   return (
     <div>
-      {/* Header */}
       <div style={{padding:"24px 24px 0",borderBottom:"1.5px solid #eee"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <h3 style={{fontSize:20,fontWeight:800}}>Indicar Motorista</h3>
-          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#bbb",lineHeight:1}}>✕</button>
+          <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#bbb"}}>✕</button>
         </div>
-        {/* barra de progresso */}
         <div style={{display:"flex",gap:5,marginBottom:10}}>
-          {[1,2,3].map(n=>(
-            <div key={n} style={{flex:1,height:5,borderRadius:3,background:step>=n?"#FFE600":"#eee",transition:"background .3s"}}/>
-          ))}
+          {[1,2,3].map(n=><div key={n} style={{flex:1,height:5,borderRadius:3,background:step>=n?"#FFE600":"#eee",transition:"background .3s"}}/>)}
         </div>
         <p style={{fontSize:13,color:"#aaa",margin:"0 0 18px"}}>
-          {step===1?"Passo 1 de 3 — Dados do motorista":step===2?"Passo 2 de 3 — Perfil e Base":"Passo 3 de 3 — Comprovantes"}
+          {step===1?"Passo 1 — Dados do motorista":step===2?"Passo 2 — Perfil e Base":"Passo 3 — Comprovantes"}
         </p>
       </div>
-
       <div style={{padding:24}}>
-        {step===1 && (
-          <div style={{display:"flex",flexDirection:"column",gap:18}}>
-            <div>
-              <label style={ST.lbl}>Nome completo *</label>
-              <input style={ST.inp} value={f.nome} onChange={e=>set("nome",e.target.value)} placeholder="Nome completo do motorista"/>
-            </div>
-            <div>
-              <label style={ST.lbl}>Telefone *</label>
-              <input style={ST.inp} value={f.tel} onChange={e=>set("tel",e.target.value)} placeholder="(11) 99999-9999"/>
-            </div>
-            <div>
-              <label style={ST.lbl}>Observações (opcional)</label>
-              <textarea style={{...ST.inp,height:80,resize:"vertical"}} value={f.obs} onChange={e=>set("obs",e.target.value)} placeholder="Alguma informação adicional..."/>
+        {step===1 && <div style={{display:"flex",flexDirection:"column",gap:18}}>
+          <div><label style={ST.lbl}>Nome completo *</label><input style={ST.inp} value={f.nome} onChange={e=>set("nome",e.target.value)} placeholder="Nome completo do motorista"/></div>
+          <div><label style={ST.lbl}>Telefone *</label><input style={ST.inp} value={f.tel} onChange={e=>set("tel",e.target.value)} placeholder="(11) 99999-9999"/></div>
+          <div><label style={ST.lbl}>Observações (opcional)</label><textarea style={{...ST.inp,height:80,resize:"vertical"}} value={f.obs} onChange={e=>set("obs",e.target.value)} placeholder="Informações adicionais..."/></div>
+        </div>}
+        {step===2 && <div style={{display:"flex",flexDirection:"column",gap:18}}>
+          <div><label style={ST.lbl}>SVC / Base *</label>
+            <select style={ST.inp} value={f.svc} onChange={e=>set("svc",e.target.value)}>
+              <option value="">Selecione o SVC...</option>
+              {SVC.map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div><label style={ST.lbl}>Perfil RNTRC *</label>
+            <div style={{display:"flex",gap:12}}>
+              {PERFIS.map(p=>(
+                <button key={p} onClick={()=>set("perfil",p)} style={{flex:1,padding:"16px 10px",borderRadius:12,cursor:"pointer",border:`2.5px solid ${f.perfil===p?"#FFE600":"#ddd"}`,background:f.perfil===p?"#FFFBE6":"#fff",fontWeight:f.perfil===p?800:400,fontSize:15,color:"#222",transition:"all .15s"}}>{p}</button>
+              ))}
             </div>
           </div>
-        )}
-
-        {step===2 && (
-          <div style={{display:"flex",flexDirection:"column",gap:18}}>
-            <div>
-              <label style={ST.lbl}>SVC / Base *</label>
-              <select style={ST.inp} value={f.svc} onChange={e=>set("svc",e.target.value)}>
-                <option value="">Selecione o SVC...</option>
-                {SVC.map(s=><option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={ST.lbl}>Perfil RNTRC *</label>
-              <div style={{display:"flex",gap:12}}>
-                {PERFIS.map(p=>(
-                  <button key={p} onClick={()=>set("perfil",p)} style={{flex:1,padding:"16px 10px",borderRadius:12,cursor:"pointer",border:`2.5px solid ${f.perfil===p?"#FFE600":"#ddd"}`,background:f.perfil===p?"#FFFBE6":"#fff",fontWeight:f.perfil===p?800:400,fontSize:15,color:"#222",transition:"all .15s"}}>
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {step===3 && (
-          <div style={{display:"flex",flexDirection:"column",gap:22}}>
-            <UploadBox label="Print do Envios Extra (tela de Ganhos)" emoji="📱" preview={ee} onFile={setEe} color="#00A650"/>
-            <UploadBox label="Print do App Logistics (Cadastro Concluído)" emoji="📦" preview={log} onFile={setLog} color="#3483FA"/>
-          </div>
-        )}
-
+        </div>}
+        {step===3 && <div style={{display:"flex",flexDirection:"column",gap:22}}>
+          <UploadBox label="Print do Envios Extra (tela de Ganhos)" emoji="📱" preview={ee} onFile={setEe} color="#00A650"/>
+          <UploadBox label="Print do App Logistics (Cadastro Concluído)" emoji="📦" preview={log} onFile={setLog} color="#3483FA"/>
+        </div>}
         <div style={{display:"flex",gap:12,marginTop:24}}>
           {step>1 && <button onClick={()=>setStep(s=>s-1)} style={ST.btnSec}>← Voltar</button>}
-          {step<3 && (
-            <button onClick={()=>setStep(s=>s+1)} disabled={step===1?!ok1:!ok2}
-              style={{...ST.btn,flex:1,opacity:(step===1?!ok1:!ok2)?.4:1}}>
-              Próximo →
-            </button>
-          )}
-          {step===3 && (
-            <button onClick={submit} disabled={!ok3||loading}
-              style={{...ST.btn,flex:1,opacity:!ok3?.4:1}}>
-              {loading?"Enviando...":"Enviar Indicação ✓"}
-            </button>
-          )}
+          {step<3 && <button onClick={()=>setStep(s=>s+1)} disabled={step===1?!ok1:!ok2} style={{...ST.btn,flex:1,opacity:(step===1?!ok1:!ok2)?.4:1}}>Próximo →</button>}
+          {step===3 && <button onClick={submit} disabled={!ok3||loading} style={{...ST.btn,flex:1,opacity:!ok3?.4:1}}>{loading?"Enviando...":"Enviar Indicação ✓"}</button>}
         </div>
       </div>
     </div>
   );
 }
 
-/* ── DETALHE / ADMIN ── */
 function Detalhe({ item, onClose, onUpdate, onDelete }) {
   const [status, setStatus] = useState(item.status);
   const [obs, setObs] = useState("");
@@ -244,28 +201,23 @@ function Detalhe({ item, onClose, onUpdate, onDelete }) {
 
   const salvar = async () => {
     setSav(true);
-    await new Promise(r=>setTimeout(r,350));
-    onUpdate({...item,status,atualizadoEm:new Date().toISOString(),
-      historico:[...(item.historico||[]),{status,data:new Date().toISOString(),obs:obs||getS(status).l}]});
+    const updated = {...item, status, atualizadoEm:new Date().toISOString(),
+      historico:[...(item.historico||[]),{status,data:new Date().toISOString(),obs:obs||getS(status).l}]};
+    await onUpdate(updated);
     setSav(false); setObs("");
   };
 
   return (
     <Modal onClose={onClose}>
       <div style={{padding:24}}>
-        {/* Header */}
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
           <div style={{display:"flex",gap:14,alignItems:"center"}}>
             <Avatar name={item.nome}/>
-            <div>
-              <h3 style={{fontSize:18,fontWeight:800,marginBottom:2}}>{item.nome}</h3>
-              <p style={{color:"#666",fontSize:14}}>{item.telefone}</p>
-            </div>
+            <div><h3 style={{fontSize:18,fontWeight:800,marginBottom:2}}>{item.nome}</h3><p style={{color:"#666",fontSize:14}}>{item.telefone}</p></div>
           </div>
           <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",fontSize:22,color:"#bbb"}}>✕</button>
         </div>
 
-        {/* Info */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
           {[["SVC / Base",item.svc],["Perfil RNTRC",item.perfil],
             ["Indicado em",new Date(item.criadoEm).toLocaleDateString("pt-BR")],
@@ -278,71 +230,44 @@ function Detalhe({ item, onClose, onUpdate, onDelete }) {
           ))}
         </div>
 
-        {item.obs && (
-          <div style={{background:"#FFFBE6",border:"1.5px solid #FFE600",borderRadius:10,padding:"10px 14px",marginBottom:18}}>
-            <p style={{fontSize:12,color:"#999",marginBottom:3}}>Observações</p>
-            <p style={{fontSize:14,color:"#333"}}>{item.obs}</p>
-          </div>
-        )}
+        {item.obs && <div style={{background:"#FFFBE6",border:"1.5px solid #FFE600",borderRadius:10,padding:"10px 14px",marginBottom:18}}>
+          <p style={{fontSize:12,color:"#999",marginBottom:3}}>Observações</p>
+          <p style={{fontSize:14,color:"#333"}}>{item.obs}</p>
+        </div>}
 
-        {/* Comprovantes */}
-        {(item.ee||item.log) && (
-          <div style={{marginBottom:18}}>
-            <p style={{fontSize:12,color:"#aaa",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>Comprovantes</p>
-            <div style={{display:"grid",gridTemplateColumns:(item.ee&&item.log)?"1fr 1fr":"1fr",gap:12}}>
-              {item.ee && (
-                <div>
-                  <p style={{fontSize:12,color:"#00A650",fontWeight:700,marginBottom:5}}>📱 Envios Extra</p>
-                  <img src={item.ee} alt="" style={{width:"100%",borderRadius:10,border:"2px solid #00A65033",cursor:"pointer"}} onClick={()=>window.open(item.ee)}/>
-                </div>
-              )}
-              {item.log && (
-                <div>
-                  <p style={{fontSize:12,color:"#3483FA",fontWeight:700,marginBottom:5}}>📦 Logistics</p>
-                  <img src={item.log} alt="" style={{width:"100%",borderRadius:10,border:"2px solid #3483FA33",cursor:"pointer"}} onClick={()=>window.open(item.log)}/>
-                </div>
-              )}
-            </div>
+        {(item.ee||item.log) && <div style={{marginBottom:18}}>
+          <p style={{fontSize:12,color:"#aaa",textTransform:"uppercase",letterSpacing:.5,marginBottom:10}}>Comprovantes</p>
+          <div style={{display:"grid",gridTemplateColumns:(item.ee&&item.log)?"1fr 1fr":"1fr",gap:12}}>
+            {item.ee && <div>
+              <p style={{fontSize:12,color:"#00A650",fontWeight:700,marginBottom:5}}>📱 Envios Extra</p>
+              <img src={item.ee} alt="" style={{width:"100%",borderRadius:10,border:"2px solid #00A65033",cursor:"pointer"}} onClick={()=>window.open(item.ee)}/>
+            </div>}
+            {item.log && <div>
+              <p style={{fontSize:12,color:"#3483FA",fontWeight:700,marginBottom:5}}>📦 Logistics</p>
+              <img src={item.log} alt="" style={{width:"100%",borderRadius:10,border:"2px solid #3483FA33",cursor:"pointer"}} onClick={()=>window.open(item.log)}/>
+            </div>}
           </div>
-        )}
+        </div>}
 
-        {/* Atualizar status */}
         <div style={{borderTop:"1.5px solid #eee",paddingTop:18,marginBottom:18}}>
           <p style={{fontWeight:800,fontSize:15,marginBottom:12}}>Atualizar Status</p>
           <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
-            {STATUS.map(st=>(
-              <button key={st.v} onClick={()=>setStatus(st.v)} style={{padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:13,fontWeight:700,border:`2px solid ${status===st.v?st.c:"#ddd"}`,background:status===st.v?st.bg:"#fff",color:status===st.v?st.c:"#888",transition:"all .15s"}}>
-                {st.l}
-              </button>
-            ))}
+            {STATUS.map(st=><button key={st.v} onClick={()=>setStatus(st.v)} style={{padding:"6px 14px",borderRadius:20,cursor:"pointer",fontSize:13,fontWeight:700,border:`2px solid ${status===st.v?st.c:"#ddd"}`,background:status===st.v?st.bg:"#fff",color:status===st.v?st.c:"#888",transition:"all .15s"}}>{st.l}</button>)}
           </div>
-          <textarea style={{...ST.inp,height:60,resize:"none",marginBottom:12}} placeholder="Observação sobre a atualização (opcional)..." value={obs} onChange={e=>setObs(e.target.value)}/>
-          <button onClick={salvar} disabled={sav} style={{...ST.btn,width:"100%",fontSize:15}}>
-            {sav?"Salvando...":"Salvar Status"}
-          </button>
+          <textarea style={{...ST.inp,height:60,resize:"none",marginBottom:12}} placeholder="Observação (opcional)..." value={obs} onChange={e=>setObs(e.target.value)}/>
+          <button onClick={salvar} disabled={sav} style={{...ST.btn,width:"100%",fontSize:15}}>{sav?"Salvando...":"Salvar Status"}</button>
         </div>
 
-        {/* Histórico */}
-        {item.historico?.length>0 && (
-          <div style={{borderTop:"1.5px solid #eee",paddingTop:16,marginBottom:18}}>
-            <p style={{fontWeight:800,fontSize:14,color:"#888",marginBottom:12}}>Histórico</p>
-            {[...item.historico].reverse().map((h,i)=>{
-              const hs=getS(h.status);
-              return (
-                <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:10}}>
-                  <div style={{width:10,height:10,borderRadius:"50%",background:hs.c,marginTop:4,flexShrink:0}}/>
-                  <div>
-                    <span style={{fontSize:13,fontWeight:700,color:hs.c}}>{hs.l}</span>
-                    <span style={{fontSize:12,color:"#bbb",marginLeft:8}}>{new Date(h.data).toLocaleString("pt-BR")}</span>
-                    {h.obs&&<p style={{margin:"3px 0 0",fontSize:12,color:"#777"}}>{h.obs}</p>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {item.historico?.length>0 && <div style={{borderTop:"1.5px solid #eee",paddingTop:16,marginBottom:18}}>
+          <p style={{fontWeight:800,fontSize:14,color:"#888",marginBottom:12}}>Histórico</p>
+          {[...item.historico].reverse().map((h,i)=>{const hs=getS(h.status);return(
+            <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start",marginBottom:10}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:hs.c,marginTop:4,flexShrink:0}}/>
+              <div><span style={{fontSize:13,fontWeight:700,color:hs.c}}>{hs.l}</span><span style={{fontSize:12,color:"#bbb",marginLeft:8}}>{new Date(h.data).toLocaleString("pt-BR")}</span>{h.obs&&<p style={{margin:"3px 0 0",fontSize:12,color:"#777"}}>{h.obs}</p>}</div>
+            </div>
+          );})}
+        </div>}
 
-        {/* Excluir */}
         <div style={{borderTop:"1.5px solid #eee",paddingTop:16}}>
           {!confirmDel
             ? <button onClick={()=>setConfirmDel(true)} style={{...ST.btnSec,color:"#F23D4F",borderColor:"#F23D4F44",fontSize:13,width:"100%"}}>🗑️ Excluir indicação</button>
@@ -360,7 +285,6 @@ function Detalhe({ item, onClose, onUpdate, onDelete }) {
   );
 }
 
-/* ── CARD DA LISTA ── */
 function Card({ item, onOpen }) {
   const s = getS(item.status);
   return (
@@ -387,24 +311,61 @@ function Card({ item, onOpen }) {
   );
 }
 
-/* ── APP PRINCIPAL ── */
 function App() {
   const [view, setView] = useState("ops");
-  const [ind, setInd] = useState(()=>db.load());
+  const [ind, setInd] = useState([]);
   const [showF, setShowF] = useState(false);
   const [det, setDet] = useState(null);
   const [filtro, setFiltro] = useState("todos");
   const [q, setQ] = useState("");
+  const [fbReady, setFbReady] = useState(!!window.__fb);
+  const [loading, setLoading] = useState(true);
 
-  const save = list => { setInd(list); db.save(list); };
+  useEffect(()=>{
+    if (!window.__fb) {
+      window.addEventListener("firebase-ready", ()=>setFbReady(true), {once:true});
+      return;
+    }
+    const {onSnapshot, collection, query, orderBy, db} = window.__fb;
+    const unsub = onSnapshot(
+      query(collection("indicacoes"), orderBy("criadoEm","desc")),
+      snap => { setInd(snap.docs.map(d=>({id:d.id,...d.data()}))); setLoading(false); },
+      err => { console.error(err); setLoading(false); }
+    );
+    return unsub;
+  }, [fbReady]);
+
+  const addInd = async (data) => {
+    const {addDoc, collection} = window.__fb;
+    await addDoc(collection("indicacoes"), data);
+  };
+
+  const updateInd = async (item) => {
+    const {updateDoc, doc, db} = window.__fb;
+    const {id, ...data} = item;
+    await updateDoc(doc(db, "indicacoes", id), data);
+    setDet({...item});
+  };
+
+  const deleteInd = async (id) => {
+    const {deleteDoc, doc, db} = window.__fb;
+    await deleteDoc(doc(db, "indicacoes", id));
+    setDet(null);
+  };
 
   const counts = STATUS.reduce((a,s)=>({...a,[s.v]:ind.filter(i=>i.status===s.v).length}),{});
-  const fil = ind.filter(i=>(filtro==="todos"||i.status===filtro)&&(!q||i.nome.toLowerCase().includes(q.toLowerCase())||i.telefone?.includes(q)));
+  const fil = ind.filter(i=>(filtro==="todos"||i.status===filtro)&&(!q||i.nome?.toLowerCase().includes(q.toLowerCase())||i.telefone?.includes(q)));
+
+  if (!fbReady || loading) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:16}}>
+      <div style={{width:48,height:48,border:"5px solid #FFE600",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <p style={{color:"#666",fontSize:16}}>Carregando...</p>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
 
   return (
     <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif",background:"#f5f5f5",minHeight:"100vh"}}>
-
-      {/* ── TOPBAR ── */}
       <div style={{background:"#1a1a1a",padding:"0 20px",position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 12px rgba(0,0,0,.3)"}}>
         <div style={{maxWidth:900,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:58}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
@@ -414,105 +375,60 @@ function App() {
           </div>
           <div style={{display:"flex",gap:3}}>
             {[{k:"ops",l:"🚛 Operação"},{k:"admin",l:"⚙️ Admin"}].map(({k,l})=>(
-              <button key={k} onClick={()=>setView(k)} style={{background:view===k?"#FFE600":"transparent",color:view===k?"#222":"#aaa",border:"none",padding:"6px 14px",borderRadius:7,cursor:"pointer",fontWeight:700,fontSize:13,transition:"all .15s"}}>
-                {l}
-              </button>
+              <button key={k} onClick={()=>setView(k)} style={{background:view===k?"#FFE600":"transparent",color:view===k?"#222":"#aaa",border:"none",padding:"6px 14px",borderRadius:7,cursor:"pointer",fontWeight:700,fontSize:13,transition:"all .15s"}}>{l}</button>
             ))}
           </div>
         </div>
       </div>
 
       <div style={{maxWidth:900,margin:"0 auto",padding:"28px 18px"}}>
-
-        {/* ── VIEW OPERAÇÃO ── */}
-        {view==="ops" && (
-          <div>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22}}>
-              <div>
-                <h2 style={{fontSize:22,fontWeight:800,marginBottom:4}}>Minhas Indicações</h2>
-                <p style={{color:"#888",fontSize:14}}>{ind.length} motorista{ind.length!==1?"s":""} indicado{ind.length!==1?"s":""}</p>
-              </div>
-              <button onClick={()=>setShowF(true)} style={{...ST.btn,fontSize:15}}>+ Indicar Motorista</button>
-            </div>
-
-            {/* Counters */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:22}}>
-              {STATUS.map(s=>(
-                <div key={s.v} style={{background:"#fff",borderRadius:12,padding:"14px 16px",border:`1.5px solid ${s.c}33`,boxShadow:"0 2px 8px rgba(0,0,0,.04)"}}>
-                  <p style={{fontSize:26,fontWeight:900,color:s.c,marginBottom:2}}>{counts[s.v]||0}</p>
-                  <p style={{fontSize:12,color:"#888"}}>{s.l}</p>
-                </div>
-              ))}
-            </div>
-
-            {ind.length===0
-              ? (
-                <div style={{textAlign:"center",padding:"60px 20px",background:"#fff",borderRadius:16,border:"1.5px solid #eee"}}>
-                  <div style={{fontSize:52,marginBottom:12}}>🚛</div>
-                  <h3 style={{fontSize:20,marginBottom:6}}>Nenhuma indicação ainda</h3>
-                  <p style={{color:"#888",fontSize:15,marginBottom:22}}>Indique um motorista para começar</p>
-                  <button onClick={()=>setShowF(true)} style={{...ST.btn,fontSize:15}}>+ Indicar Motorista</button>
-                </div>
-              )
-              : <div style={{display:"flex",flexDirection:"column",gap:10}}>{ind.map(i=><Card key={i.id} item={i} onOpen={setDet}/>)}</div>
-            }
+        {view==="ops" && <>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22}}>
+            <div><h2 style={{fontSize:22,fontWeight:800,marginBottom:4}}>Minhas Indicações</h2><p style={{color:"#888",fontSize:14}}>{ind.length} motorista{ind.length!==1?"s":""} indicado{ind.length!==1?"s":""}</p></div>
+            <button onClick={()=>setShowF(true)} style={{...ST.btn,fontSize:15}}>+ Indicar Motorista</button>
           </div>
-        )}
-
-        {/* ── VIEW ADMIN ── */}
-        {view==="admin" && (
-          <div>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22}}>
-              <div>
-                <h2 style={{fontSize:22,fontWeight:800,marginBottom:4}}>Painel Administrativo</h2>
-                <p style={{color:"#888",fontSize:14}}>{ind.length} indicações no total</p>
-              </div>
-              <button onClick={()=>setShowF(true)} style={{...ST.btn,fontSize:15}}>+ Indicar</button>
-            </div>
-
-            {/* Filtros por status */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:22}}>
-              {STATUS.map(s=>(
-                <div key={s.v} onClick={()=>setFiltro(filtro===s.v?"todos":s.v)}
-                  style={{background:filtro===s.v?s.bg:"#fff",borderRadius:12,padding:"14px 16px",border:`2px solid ${filtro===s.v?s.c:"#eee"}`,cursor:"pointer",transition:"all .15s",boxShadow:"0 2px 8px rgba(0,0,0,.04)"}}>
-                  <p style={{fontSize:26,fontWeight:900,color:s.c,marginBottom:2}}>{counts[s.v]||0}</p>
-                  <p style={{fontSize:12,color:"#888"}}>{s.l}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Busca */}
-            <div style={{display:"flex",gap:10,marginBottom:16}}>
-              <input style={{...ST.inp,flex:1,fontSize:15}} placeholder="🔍  Buscar por nome ou telefone..." value={q} onChange={e=>setQ(e.target.value)}/>
-              {filtro!=="todos"&&<button onClick={()=>setFiltro("todos")} style={{...ST.btnSec,whiteSpace:"nowrap",fontSize:13}}>Limpar filtro ✕</button>}
-            </div>
-
-            {fil.length===0
-              ? <div style={{textAlign:"center",padding:44,background:"#fff",borderRadius:14,color:"#aaa",fontSize:15}}>Nenhum resultado encontrado.</div>
-              : <div style={{display:"flex",flexDirection:"column",gap:10}}>{fil.map(i=><Card key={i.id} item={i} onOpen={setDet}/>)}</div>
-            }
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:22}}>
+            {STATUS.map(s=><div key={s.v} style={{background:"#fff",borderRadius:12,padding:"14px 16px",border:`1.5px solid ${s.c}33`,boxShadow:"0 2px 8px rgba(0,0,0,.04)"}}>
+              <p style={{fontSize:26,fontWeight:900,color:s.c,marginBottom:2}}>{counts[s.v]||0}</p>
+              <p style={{fontSize:12,color:"#888"}}>{s.l}</p>
+            </div>)}
           </div>
-        )}
+          {ind.length===0
+            ? <div style={{textAlign:"center",padding:"60px 20px",background:"#fff",borderRadius:16,border:"1.5px solid #eee"}}>
+                <div style={{fontSize:52,marginBottom:12}}>🚛</div>
+                <h3 style={{fontSize:20,marginBottom:6}}>Nenhuma indicação ainda</h3>
+                <p style={{color:"#888",fontSize:15,marginBottom:22}}>Indique um motorista para começar</p>
+                <button onClick={()=>setShowF(true)} style={{...ST.btn,fontSize:15}}>+ Indicar Motorista</button>
+              </div>
+            : <div style={{display:"flex",flexDirection:"column",gap:10}}>{ind.map(i=><Card key={i.id} item={i} onOpen={setDet}/>)}</div>
+          }
+        </>}
+
+        {view==="admin" && <>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22}}>
+            <div><h2 style={{fontSize:22,fontWeight:800,marginBottom:4}}>Painel Administrativo</h2><p style={{color:"#888",fontSize:14}}>{ind.length} indicações no total</p></div>
+            <button onClick={()=>setShowF(true)} style={{...ST.btn,fontSize:15}}>+ Indicar</button>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:22}}>
+            {STATUS.map(s=><div key={s.v} onClick={()=>setFiltro(filtro===s.v?"todos":s.v)}
+              style={{background:filtro===s.v?s.bg:"#fff",borderRadius:12,padding:"14px 16px",border:`2px solid ${filtro===s.v?s.c:"#eee"}`,cursor:"pointer",transition:"all .15s",boxShadow:"0 2px 8px rgba(0,0,0,.04)"}}>
+              <p style={{fontSize:26,fontWeight:900,color:s.c,marginBottom:2}}>{counts[s.v]||0}</p>
+              <p style={{fontSize:12,color:"#888"}}>{s.l}</p>
+            </div>)}
+          </div>
+          <div style={{display:"flex",gap:10,marginBottom:16}}>
+            <input style={{...ST.inp,flex:1,fontSize:15}} placeholder="🔍  Buscar por nome ou telefone..." value={q} onChange={e=>setQ(e.target.value)}/>
+            {filtro!=="todos"&&<button onClick={()=>setFiltro("todos")} style={{...ST.btnSec,whiteSpace:"nowrap",fontSize:13}}>Limpar ✕</button>}
+          </div>
+          {fil.length===0
+            ? <div style={{textAlign:"center",padding:44,background:"#fff",borderRadius:14,color:"#aaa",fontSize:15}}>Nenhum resultado encontrado.</div>
+            : <div style={{display:"flex",flexDirection:"column",gap:10}}>{fil.map(i=><Card key={i.id} item={i} onOpen={setDet}/>)}</div>
+          }
+        </>}
       </div>
 
-      {/* ── MODALS ── */}
-      {showF && (
-        <Modal onClose={()=>setShowF(false)}>
-          <FormIndicar
-            onSubmit={r=>{ save([r,...ind]); setShowF(false); }}
-            onClose={()=>setShowF(false)}
-          />
-        </Modal>
-      )}
-
-      {det && (
-        <Detalhe
-          item={det}
-          onClose={()=>setDet(null)}
-          onUpdate={u=>{ save(ind.map(i=>i.id===u.id?u:i)); setDet(u); }}
-          onDelete={id=>{ save(ind.filter(i=>i.id!==id)); setDet(null); }}
-        />
-      )}
+      {showF && <Modal onClose={()=>setShowF(false)}><FormIndicar onSubmit={async r=>{await addInd(r);setShowF(false);}} onClose={()=>setShowF(false)}/></Modal>}
+      {det && <Detalhe item={det} onClose={()=>setDet(null)} onUpdate={updateInd} onDelete={deleteInd}/>}
     </div>
   );
 }
